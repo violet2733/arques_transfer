@@ -137,10 +137,10 @@ func (c *Client) parseRequest(r *request, opts ...RequestOption) (err error) {
 
 	c.debug("full url: %s, body: %s", fullURL, bodyString)
 
-	fmt.Println(fullURL)
-	fmt.Println(header)
-	fmt.Println(bodyString)
-	fmt.Println(string(bodyBytes))
+	// fmt.Println(fullURL)
+	// fmt.Println(header)
+	// fmt.Println(bodyString)
+	// fmt.Println(string(bodyBytes))
 
 	r.fullURL = fullURL
 	r.header = header

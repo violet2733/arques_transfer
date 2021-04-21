@@ -134,6 +134,11 @@ webSocket.onmessage = function(msg) {
         btnSecond.attr("disabled", false);
         $('#lb_notice').text(d.Title);
     }
+    else if (d.Title == "GoPaxOrder Error") {
+        btnFirst.attr("disabled", false);
+        btnSecond.attr("disabled", false);
+        $('#lb_notice').text(d.Title);
+    }
 }
     
 

@@ -236,7 +236,6 @@ func newBinanceFutureClient(symbol string) *BinanceFutureClient {
 	c := &BinanceFutureClient{}
 	c.ApiKey = config.Get().Binance.ApiKey
 	c.SecretKey = config.Get().Binance.SecretKey
-	// c.Client = binance.NewClient(c.ApiKey, c.SecretKey)
 	c.Client = futures.NewClient(c.ApiKey, c.SecretKey)
 
 	c.Symbol = fmt.Sprintf("%sUSDT", symbol)
@@ -376,7 +375,7 @@ func (c *GimchiClient) GetGimchiPremium() (data *GimchiData, err error) {
 	c.Data.GopaxPrice = float64(int(gopaxData.Price))
 
 	binanceData, err := c.BinanceFutureClient.Client.NewPremiumIndexService().Symbol(c.BinanceFutureClient.Symbol).Do(c.ctx)
-	// fmt.Println(binanceData)
+
 	if err != nil {
 		c.Logger.WithError(err).Error("Failed to get binance Mark Price")
 		return nil, err
@@ -1757,9 +1756,9 @@ func (c *GimchiClient) createGoPaxOrder(i int) error {
 		buyPrice := c.WorkInfo.ThreadPrice
 		orderPrice := c.GoPaxClient.OrderBook.Data.Ask[1].Price
 		orderAmount := float64(buyPrice) / orderPrice
-		fmt.Println(orderAmount)
-		orderAmount = math.Round(orderAmount*10000) / 10000
-		fmt.Println(orderAmount)
+		// fmt.Println(orderAmount)
+		orderAmount = math.Round(orderAmount*1000) / 1000
+		// fmt.Println(orderAmount)
 
 		if orderAmount < 0.01 {
 			orderAmount = 0.01
@@ -1773,14 +1772,19 @@ func (c *GimchiClient) createGoPaxOrder(i int) error {
 
 		res, err := c.GoPaxClient.Client.NewCreateOrderService().ClientOrderID(clientOrderId).TradingPairName(c.GoPaxClient.Symbol).Side("buy").Type("limit").Price(int64(orderPrice)).Amount(orderAmount).Do(c.ctx)
 		if err != nil {
-			c.Logger.WithError(err).Error("Failed to gopax order")
+			c.Logger.WithError(err).WithField("orderAmount", orderAmount).Error("Failed to gopax order")
+			noti := Message{
+				Title: "GoPaxOrder Error",
+				Msg:   "Failed to gopax order - " + err.Error(),
+			}
+			c.RedisPublish(noti)
 			resChannel <- nil
 			errChannel <- err
 			return
 		}
 
-		fmt.Println(res)
-		fmt.Println(res.Id)
+		// fmt.Println(res)
+		// fmt.Println(res.Id)
 		orderId, err := strconv.Atoi(res.Id)
 		if err != nil {
 			c.Logger.WithError(err).Error("Failed to gopax order id not found")
@@ -1812,7 +1816,7 @@ func (c *GimchiClient) createBinanceSpotOrder(i int) error {
 		return err
 	}
 	remainAmount, _ := strconv.ParseFloat(data.Free, 8)
-	remainAmount = math.Floor(remainAmount*10000) / 10000
+	remainAmount = math.Floor(remainAmount*1000) / 1000
 
 	resChannel := make(chan *binance.CreateOrderResponse, 1)
 	errChannel := make(chan error, 1)
@@ -1823,7 +1827,7 @@ func (c *GimchiClient) createBinanceSpotOrder(i int) error {
 		// Binance Spot Order
 		orderAmount := c.WorkInfo.SecondStep.BinanceSpotWorks[i].OrderAmount
 
-		orderAmount = math.Floor(orderAmount*10000) / 10000
+		orderAmount = math.Floor(orderAmount*1000) / 1000
 
 		if orderAmount > remainAmount {
 			orderAmount = remainAmount
@@ -1878,6 +1882,9 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		// First Step 에서는 Limit Order 로 Sell 처리
 
 		orderamount = c.WorkInfo.FirstStep.GoPaxWorks[i].OrderAmount
+		// Binance 는 주문을 소수점 3자리까지 가능
+		orderamount = math.Floor(orderamount*1000) / 1000
+
 		binanceOrderPrice, err := strconv.ParseFloat(c.BinanceFutureClient.OrderBook.Data.Bids[1].Price, 2)
 		if err != nil {
 			c.Logger.WithError(err).Error("Failed convert binance future orderbook price")
@@ -1913,6 +1920,7 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		if orderamount > remainAmount {
 			orderamount = remainAmount
 		}
+		orderamount = math.Floor(orderamount*1000) / 1000
 
 		c.WorkInfo.SecondStep.BinanceFutureWorks[i].CreatedAt = common.Now()
 
@@ -1936,7 +1944,7 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 
 		res, err := order.Do(c.ctx)
 		if err != nil {
-			c.Logger.WithError(err).Error("Failed to create order in binance future.")
+			c.Logger.WithError(err).WithField("orderAmount", orderamount).Error("Failed to create order in binance future.")
 			resChannel <- nil
 			errChannel <- err
 			return
