@@ -1,0 +1,400 @@
+  
+{{define "head"}}    
+
+{{end}}
+
+{{define "content"}}
+<div class="row">
+    <div class="col-lg-12">
+        현재 Symbol : <span id="txt_symbol"></span><br/>
+        현재 김프 : <span id="txt_rate"></span><br/>
+        현재 GoPax : <span id="txt_gopax"></span><br/>
+        현재 Binance : <span id="txt_binance"></span><br/>
+        <hr/>
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-12">
+        Work Info Input Form
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-3">
+        김프 : 
+    </div>
+    <div class="col-lg-9">
+        <input type="text" id="txt_gimchiPremium" class="number" />
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-3">
+        이체할 금액 (KRW) : 
+    </div>
+    <div class="col-lg-9">
+        <input type="text" id="txt_workPrice" class="number money" /> &nbsp;<span id="lb_workPrice" ></span>
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-3">
+        작업 코인 (Symbol) : 
+    </div>
+    <div class="col-lg-9">
+        <input type="text" id="txt_workSymbol" />
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-3">
+        1차 작업 분할 가격 (KRW) : 
+    </div>
+    <div class="col-lg-9">
+        <input type="text" id="txt_threadPrice" class="number money" /> &nbsp;<span id="lb_threadPrice" ></span> ( GoPax 는 최소 0.01 개는 살 수 있는 가격이 등록되어야 합니다. )
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-3">
+        2차 작업 등분 ( N 등분 ) : 
+    </div>
+    <div class="col-lg-9">
+        <input type="text" id="txt_equalParts" class="number" />
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-12">
+        <a href="#" id="btnWorkInfoSave" class="btn btn-sm btn-info" onclick="saveWorkInfo()" >Work Info 저장</a>
+        <hr/>
+    </div>
+</div>
+<div class="row">
+    <div class="col-lg-12">
+        <span>Work Info View</span></br>
+        <textarea id="txt_info" rows="2" cols="150"></textarea><br/>
+        <hr>        
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-12">
+        <span>Work Log</span></br>
+        <textarea id="txt_log" rows="10" cols="150"></textarea><br/>
+        <hr>
+    </div>
+</div>
+<a href="#" id="btnFirst" class="btn btn-sm btn-primary" onclick="startTransferFirst()" >1차 시작 ( 김프 모니터링 및 Gopax buy and Binance Future Short Position )</a>&nbsp;
+<a href="#" id="btnSecond" class="btn btn-sm btn-danger" onclick="startTransferSecond()" >2차 시작 ( Binance Spot sell and Binance Future Short Close )</a>
+<br/>
+<span id="lb_notice" class="text-danger" ></span>
+{{end}}
+
+
+{{define "javascript"}}
+
+<script type="text/javascript">
+
+var webSocket = new WebSocket("ws://localhost/transferlog");
+var messageTextArea = $('#txt_log');
+
+var btnFirst = $('#btnFirst');
+var btnSecond = $('#btnSecond');
+var accountInterval;
+
+webSocket.onopen = function(msg) {
+    $('#txt_log').val("server open!\n");
+    $('#txt_log').focus();
+
+    
+}
+
+webSocket.onclose = function(msg) {
+    var a = $('#txt_log').val();
+    $('#txt_log').val("server close!\n" + a);
+    $('#txt_log').focus();
+}
+
+webSocket.onerror = function(msg) {
+    var a = $('#txt_log').val();
+    $('#txt_log').val("err\n" + a);
+    $('#txt_log').focus();
+}
+
+webSocket.onmessage = function(msg) {
+    var a = $('#txt_log').val();
+    $('#txt_log').val(msg.data + "\n" + a);
+    $('#txt_log').focus();
+
+    var d = JSON.parse(msg.data);
+    //console.log(d);
+    //console.log(d.Title);
+    if (d.Title == "GoPax2Binance - FirstStep - Finish") {
+        btnFirst.attr("disabled", false);
+        btnSecond.attr("disabled", false);
+        $('#lb_notice').text(d.Title);
+    }
+    else if (d.Title == "GoPax2Binance - SecondStep - Finish") {
+        btnFirst.attr("disabled", false);
+        btnSecond.attr("disabled", false);
+        $('#lb_notice').text(d.Title);
+    }
+}
+    
+
+$(document).ready(function(){
+    intervalGimchi();
+    getWorkInfo();
+
+    $('.number').keyup(function(){
+        OnlyNumber(this);
+    });
+
+    $('.money').keyup(function(){
+        id = $(this).attr('id');
+        setLabelMoney(id);
+    });
+
+    
+});
+
+function setLabelMoney(id) {            
+    m = $('#' + id).val();
+    // 소수점만..
+    m = m.replace(/[^\.|^0(0)+|^0-9\.]/g, '');    
+    var arr = m.split(".");
+    if(arr.length > 2) {
+        m = arr[0] + '.' + arr[1];
+    }    
+    // money 로 콤마
+    m = m.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    
+    subId = "lb_" + id.replace("txt_", "");
+    $('#' + subId).text("( " + m + " )");
+}
+
+function OnlyNumber(obj) {
+    console.log(obj);
+    $(obj).keyup(function(){
+        if ($(obj).val() != null && $(obj).val() != "") {
+            var tmps = $(obj).val().replace(/[^\.|^0(0)+|^0-9\.]/g, '');
+            /* 소수점은 하나만 입력되도록*/
+            var arr = tmps.split(".");
+            if(arr.length > 2) {
+                tmps = arr[0] + '.' + arr[1];
+            }
+            $(obj).val(tmps);
+        }
+    });
+
+    $(obj).focusout(function() {
+        if( $(obj).val() != null && $(obj).val() != '' ) {
+            var tmps = $(obj).val().replace(/[^\.|^0(0)+|^0-9\.]/g, '');
+
+            /* 소수점은 하나만 입력되도록*/
+            var arr = tmps.split(".");
+            if(arr.length > 2) {
+                tmps = arr[0] + '.' + arr[1];
+            }
+            $(obj).val(tmps);
+        }
+    });
+}
+
+function getWorkInfo() {
+    $.ajax({
+        url: "/workinfo",
+        sync: true,
+        type: "GET",
+        dataType: "json",
+        success: function(response) {
+            //webSocket.send("");
+            _text = JSON.stringify(response);
+            console.log(response);
+            var a = $('#txt_info').val();
+            $('#txt_info').val(_text);
+
+            $('#txt_gimchiPremium').val(response.gimchiPremium);
+            $('#txt_workPrice').val(response.workPrice);
+            $('#txt_workSymbol').val(response.workSymbol);
+            $('#txt_threadPrice').val(response.threadPrice);
+            $('#txt_equalParts').val(response.equalParts);
+
+            setLabelMoney("txt_workPrice");
+            setLabelMoney("txt_threadPrice");
+
+        },
+        error: function(xhr){
+            console.log(xhr);
+        }
+    });
+}
+
+function startTransferFirst() {
+    
+    clearInterval(accountInterval);
+    $('#lb_notice').text("");
+
+    btnFirst.attr('disabled', true);
+    btnSecond.attr('disabled', true);
+
+    $.ajax({
+        url: "/firststart",
+        sync: true,
+        type: "GET",
+        dataType: "json",
+        success: function(response) {
+            
+            var a = $('#txt_log').val();
+            $('#txt_log').val("Gopax2Binance First Step Work Start\n" + a);
+        },
+        error: function(xhr){
+            console.log(xhr);
+        }
+    });
+}
+
+function startTransferSecond() {
+
+    clearInterval(accountInterval);
+    $('#lb_notice').text("");
+
+    btnFirst.attr("disabled", true);
+    btnSecond.attr("disabled", true);
+
+    symbol = $('#txt_symbol').text();
+
+    $.ajax({
+        url: "/checkbalance",
+        sync: true,
+        type: "GET",
+        dataType: "json",
+        success: function(response) {
+            if (response.asset == symbol && parseFloat(response.free) > 0) {
+                msg = "현재 Binance Spot Balance\nSymbol : " + response.asset + "\nBalance : " + response.free + "\n\n해당 자금 상태로 2차 작업 진행하시겠습니까?";
+                if (confirm(msg)) {
+                    $.ajax({
+                        url: "/secondstart",
+                        sync: true,
+                        type: "GET",
+                        dataType: "json",
+                        success: function(response) {                            
+                            var a = $('#txt_log').val();
+                            $('#txt_log').val("Gopax2Binance Second Step Work Start\n" + a);
+                        },
+                        error: function(xhr){
+                            console.log(xhr);
+                        }
+                    });
+                }
+                else {
+                    btnFirst.attr("disabled", false);                    
+                    btnSecond.attr("disabled", false);                    
+                }
+            }
+            else {
+                btnFirst.attr("disabled", false);
+                btnSecond.attr("disabled", false);                    
+            }
+        },
+        error: function(xhr){
+            console.log(xhr);
+        }
+    });
+}
+
+function intervalGimchi() {
+    getGimchi();
+
+    accountInterval = setInterval(function() {
+        getGimchi();
+    }, 10000);
+}
+
+function getGimchi() {
+
+    $.ajax({
+        url: "/gimchi",
+        sync: true,
+        type: "GET",
+        dataType: "json",
+        success: function(response) {
+            //console.log(response);
+            $.ajax({
+                url: "/workinfo",
+                sync: true,
+                type: "GET",
+                dataType: "json",
+                success: function(work) {
+                    $('#txt_symbol').text(work.workSymbol);
+                    $('#txt_rate').text(response.Rate);
+                    $('#txt_gopax').text(response.GopaxPrice + " KRW");
+                    $('#txt_binance').text(response.BinancePrice + " USD");
+                },
+                error: function(xhr){
+                    console.log(xhr);
+                }
+            });
+        },
+        error: function(xhr){
+            console.log(xhr);
+        }
+    });
+}
+
+function saveWorkInfo() {
+    //info = $('#txt_info').val();    
+    $('#lb_notice').text("");
+    if ($('#txt_gimchiPremium').val() == "") {
+        $('#lb_notice').text("김프를 확인해 주세요.");
+        return false;
+    }
+    else if ($('#txt_workPrice').val() == "") {
+        $('#lb_notice').text("이체할 금액을 확인해 주세요.");
+        return false;
+    }
+    else if ($("#txt_workSymbol").val() == "") {
+        $('#lb_notice').text('작업 코인을 확인해 주세요.');
+        return false;        
+    }
+    else if ($("#txt_threadPrice").val() == "") {
+        $('#lb_notice').text("1차 작업 분할 가격을 확인해 주세요.");
+        return false;
+    }
+    else if ($('#txt_equalParts').val() == "") {
+        $('#lb_notice').text("2차 작업 등분을 확인해 주세요.");
+        return false;
+    }
+    else {
+        var o = Object();
+        o.gimchiPremium = $('#txt_gimchiPremium').val();
+        o.workPrice = $('#txt_workPrice').val();
+        o.workSymbol = $('#txt_workSymbol').val();
+        o.threadPrice = $('#txt_threadPrice').val();
+        o.equalParts = $('#txt_equalParts').val();
+
+        $.ajax({
+            url: "/setworkinfo",
+            sync: true,
+            type: "POST",
+            dataType: "json",
+            data: o,
+            success: function(response) {
+                if (response == "ok") {
+                    clearInterval(accountInterval);
+                    intervalGimchi();
+                    getWorkInfo();
+                }
+                else {
+                    $('#lb_notice').text("파일 수정이 정상적으로 이루어지지 않았습니다.");
+                }
+            },
+            error: function(xhr) {
+                console.log(xhr);
+            }
+        });            
+    }
+
+    
+}
+
+
+
+</script>
+
+{{end}}

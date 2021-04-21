@@ -1,0 +1,33 @@
+# fixer.io
+fixer:
+  url: "http://data.fixer.io/api/latest"
+  api_key: "cd29943f67c047c31423cb605e9e0a19"
+
+# Gopax
+gopax:
+  api_key: "1-32769e1a-99e6-4f72-b727-757d4d234-des19eaa54fb4d58311d5ce3553d"
+  secret_key: "E/spd/S46uQOAGgaYVmYHS3Hiu6ls6KvCFL3wxF7dGvRGFXsvWfo8pM+xIMW1Zolp91EKobU/kjkAdk1mdg0vA=="  
+
+# Binance
+binance:
+  api_key: "gKbRwQK24jLFc37GaXJReUgpih4I8BhU2N2ug4lUPShV4mDjPcElVFKGuYRFxzuS"
+  secret_key: "kMEqN5mpPpbsJueUa4fhSQTF2owi1Y690im2BTqUWg7Z4samKWspFXn0C7SE55cv"
+
+# Admin Data
+adminsql:
+  url: "10.130.81.3" # live
+  # url: "10.130.81.7" # dev
+  port: 5432
+  db: "admin"  
+  id: "postgres"
+  pw: "dkznltm!4321"
+
+# Redis
+redis:
+  url: "10.130.80.4"
+  port: 6379
+
+# Slack
+slack:
+  url: "https://asia-northeast3-r-arques-alphasystem.cloudfunctions.net/slack_noti"
+
