@@ -298,6 +298,10 @@ function startTransferSecond() {
             }
         },
         error: function(xhr){
+            alert(xhr.responseText);
+            $('#lb_notice').text(xhr.responseText);
+            btnFirst.attr("disabled", false);
+            btnSecond.attr("disabled", false);   
             console.log(xhr);
         }
     });

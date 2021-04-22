@@ -311,10 +311,22 @@ func CheckBinanceSpotBalance() (data *binance.Balance, err error) {
 	c := newClient()
 	data, err = c.getBinanceSpotAccountInfo()
 	if err != nil {
+		c.Logger.WithError(err).Error("CheckBinanceSpotBalance")
 		return nil, err
 	}
 
-	return data, err
+	return data, nil
+}
+
+func CheckBinanceFutureBalance() (data *futures.AccountPosition, err error) {
+	c := newClient()
+	data, err = c.getBinanceFutureAccountInfo()
+	if err != nil {
+		c.Logger.WithError(err).Error("CheckBinanceFutureBalance")
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // GoPax2Binance First Step Start
@@ -1990,6 +2002,7 @@ func (c *GimchiClient) setWorkInfoFinish() error {
 func (c *GimchiClient) getBinanceSpotAccountInfo() (data *binance.Balance, err error) {
 	res, err := c.BinanceSpotClient.Client.NewGetAccountService().Do(c.ctx)
 	if err != nil {
+		c.Logger.WithError(err).Error("Binance Spot Balance check")
 		return nil, err
 	}
 

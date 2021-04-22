@@ -96,6 +96,16 @@ func CheckBinanceSpotBalance(c echo.Context) error {
 	data, err := worker.CheckBinanceSpotBalance()
 
 	if err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func CheckBinanceFutureBalance(c echo.Context) error {
+	data, err := worker.CheckBinanceFutureBalance()
+
+	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 

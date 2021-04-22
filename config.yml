@@ -5,13 +5,13 @@ fixer:
 
 # Gopax
 gopax:
-  api_key: "1-32769e1a-99e6-4f72-b727-757d4d234-des19eaa54fb4d58311d5ce3553d"
-  secret_key: "E/spd/S46uQOAGgaYVmYHS3Hiu6ls6KvCFL3wxF7dGvRGFXsvWfo8pM+xIMW1Zolp91EKobU/kjkAdk1mdg0vA=="  
+  api_key: "1-10adb8ff-0a33-47fa-b1bc-bc52f7a15-desfffb85b425ce5f6b29fade706"
+  secret_key: "66cv6ezs8UMpk9cWZmHw0LbB2tdOjBkU/yENfgYQr1pRZH4/qqJPD37ZRCgw58eCSVVm+zVCwwo7AXRUSJtCUA=="  
 
 # Binance
 binance:
-  api_key: "gKbRwQK24jLFc37GaXJReUgpih4I8BhU2N2ug4lUPShV4mDjPcElVFKGuYRFxzuS"
-  secret_key: "kMEqN5mpPpbsJueUa4fhSQTF2owi1Y690im2BTqUWg7Z4samKWspFXn0C7SE55cv"
+  api_key: "oXVHmRfCSDDtDbB2O53fO41Eu2hVAfghsJZsSXnIsfe2IYtXipGHhbg9mnulC5R8"
+  secret_key: "FCR6vghJEh9Dp6Jq9ZpBWEFXwQ9AtC3oAy5Lx1apecpFTOj0hW4Pdd5bnbwXEIKE"
 
 # Admin Data
 adminsql:

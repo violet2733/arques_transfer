@@ -35,6 +35,7 @@ func main() {
 	e.GET("/gimchi", api.GimchiPremium)
 	e.POST("/setworkinfo", api.SetWorkInfo)
 	e.GET("/checkbalance", api.CheckBinanceSpotBalance)
+	e.GET("/checkbalancefuture", api.CheckBinanceFutureBalance)
 
 	e.GET("/firststart", api.StartTransferFirstStep)
 	e.GET("/secondstart", api.StartTransferSecondStep)
