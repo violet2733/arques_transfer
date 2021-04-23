@@ -10,8 +10,8 @@ gopax:
 
 # Binance
 binance:
-  api_key: "oXVHmRfCSDDtDbB2O53fO41Eu2hVAfghsJZsSXnIsfe2IYtXipGHhbg9mnulC5R8"
-  secret_key: "FCR6vghJEh9Dp6Jq9ZpBWEFXwQ9AtC3oAy5Lx1apecpFTOj0hW4Pdd5bnbwXEIKE"
+  api_key: "hfv9l9JsCPWPzyDqZunOZxKVrjf6iCttXckxK2fvRtHWRS9oxHl3Kxfy3BSI2GFg"
+  secret_key: "o82w412GhZLb4vOv4B1YIDsbpNc2XOtarFLYeMB7wJ3GJC3eSlHppWFBnLFp2MhU"
 
 # Admin Data
 adminsql:

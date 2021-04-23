@@ -92,6 +92,14 @@ func SetWorkInfo(c echo.Context) error {
 	return c.JSON(http.StatusOK, "ok")
 }
 
+func CheckGopaxBalance(c echo.Context) error {
+	data, err := worker.CheckGopaxBalance()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+	return c.JSON(http.StatusOK, data)
+}
+
 func CheckBinanceSpotBalance(c echo.Context) error {
 	data, err := worker.CheckBinanceSpotBalance()
 
@@ -104,6 +112,16 @@ func CheckBinanceSpotBalance(c echo.Context) error {
 
 func CheckBinanceFutureBalance(c echo.Context) error {
 	data, err := worker.CheckBinanceFutureBalance()
+
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	return c.JSON(http.StatusOK, data)
+}
+
+func GetTradeBinanceFuture(c echo.Context) error {
+	data, err := worker.GetBinanceFutureOrderHistory()
 
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)

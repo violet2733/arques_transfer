@@ -34,11 +34,14 @@ func main() {
 	e.GET("/workinfo", worker.GetWorkInfo)
 	e.GET("/gimchi", api.GimchiPremium)
 	e.POST("/setworkinfo", api.SetWorkInfo)
+	e.GET("/checkbalancegopax", api.CheckGopaxBalance)
 	e.GET("/checkbalance", api.CheckBinanceSpotBalance)
 	e.GET("/checkbalancefuture", api.CheckBinanceFutureBalance)
 
 	e.GET("/firststart", api.StartTransferFirstStep)
 	e.GET("/secondstart", api.StartTransferSecondStep)
+
+	e.GET("/tradebinancefuture", api.GetTradeBinanceFuture)
 
 	e.Logger.Fatal(e.Start(":80"))
 }
