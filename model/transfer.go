@@ -47,8 +47,9 @@ type (
 		OrderId     int64
 		OrderPrice  float64
 		OrderAmount float64
-		IsFinished  bool
-		CreatedAt   int64
-		UpdatedAt   int64
+		// OrderFillAmount float64
+		IsFinished bool
+		CreatedAt  int64
+		UpdatedAt  int64
 	}
 )
