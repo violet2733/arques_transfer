@@ -171,6 +171,12 @@ func (c *Client) callAPI(ctx context.Context, r *request, opts ...RequestOption)
 	if err != nil {
 		return []byte{}, err
 	}
+
+	if res.StatusCode != 200 {
+		code := strconv.Itoa(res.StatusCode)
+		fmt.Println("gopax api http status code = " + code)
+	}
+
 	data, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		return []byte{}, err

@@ -1948,9 +1948,12 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		clientOrderId = fmt.Sprintf("binance_future_first_%s", strconv.Itoa(i+1))
 
 		// Binance Future Order
-		order = c.BinanceFutureClient.Client.NewCreateOrderService().Symbol(c.BinanceFutureClient.Symbol).Side(futures.SideTypeSell).Type(futures.OrderTypeLimit).TimeInForce(futures.TimeInForceTypeGTC)
+		// order = c.BinanceFutureClient.Client.NewCreateOrderService().Symbol(c.BinanceFutureClient.Symbol).Side(futures.SideTypeSell).Type(futures.OrderTypeLimit).TimeInForce(futures.TimeInForceTypeGTC)
+		// order.Quantity(strconv.FormatFloat(orderamount, 'g', -1, 64))
+		// order.Price(c.BinanceFutureClient.OrderBook.Data.Bids[1].Price)
+		// order.NewClientOrderID(clientOrderId)
+		order = c.BinanceFutureClient.Client.NewCreateOrderService().Symbol(c.BinanceFutureClient.Symbol).Side(futures.SideTypeSell).Type(futures.OrderTypeMarket)
 		order.Quantity(strconv.FormatFloat(orderamount, 'g', -1, 64))
-		order.Price(c.BinanceFutureClient.OrderBook.Data.Bids[1].Price)
 		order.NewClientOrderID(clientOrderId)
 
 	} else if c.WorkStep == 2 {
