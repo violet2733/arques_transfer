@@ -1195,7 +1195,11 @@ func (c *GimchiClient) handleBinanceOrderTradeUpdate(exchangeType ExchangeType, 
 	// 각 스텝의 주문정보를 orderID 를 통해 조회한다.
 	i, openOrder, err := c.filterOrderWork(exchangeType, orderID)
 	if err != nil {
-		return err
+		// orderID 로 못찾을 경우 ClientOrderId 로 다시 한번 찾기
+		i, openOrder, err = c.filterOrderWorkByClientOrderId(exchangeType, o.Result.ClientOrderID)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch o.Result.OrderStatus {
@@ -1248,7 +1252,11 @@ func (c *GimchiClient) handleBinanceOrderTradeResult(exchangeType ExchangeType, 
 	// 각 스텝의 주문정보를 orderID 를 통해 조회한다.
 	i, openOrder, err := c.filterOrderWork(exchangeType, orderID)
 	if err != nil {
-		return err
+		// orderID 로 못찾을 경우 ClientOrderId 로 다시 한번 찾기
+		i, openOrder, err = c.filterOrderWorkByClientOrderId(exchangeType, o.ClientOrderID)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch o.ExecutionType {
@@ -1339,6 +1347,55 @@ func (c *GimchiClient) filterOrderWork(exchangeType ExchangeType, orderId int64)
 				}
 			}
 			return -1, nil, errors.New("not found work by orderId")
+		} else {
+			return -1, nil, errors.New("this step doesn`t have object.")
+		}
+	}
+
+	return -1, nil, errors.New("another exchange error")
+}
+
+// 각 스탭 별 실행될 주문 내역을 OrderID 를 통해 조회하는 메소드
+func (c *GimchiClient) filterOrderWorkByClientOrderId(exchangeType ExchangeType, clientOrderId string) (idx int, data *model.OrderWork, err error) {
+	if exchangeType == ExchangeTypeGoPax {
+		if c.WorkStep == 1 {
+			for i, r := range c.WorkInfo.FirstStep.GoPaxWorks {
+				if r.ClientOrderId == clientOrderId {
+					return i, r, nil
+				}
+			}
+			return -1, nil, errors.New("not found work by clientOrderId")
+		} else {
+			return -1, nil, errors.New("gopax only 1 step")
+		}
+	} else if exchangeType == ExchangeTypeBinanceFuture {
+		if c.WorkStep == 1 {
+			for i, r := range c.WorkInfo.FirstStep.BinanceFutureWorks {
+				if r.ClientOrderId == clientOrderId {
+					return i, r, nil
+				}
+			}
+			return -1, nil, errors.New("not found work by clientOrderId")
+		} else if c.WorkStep == 2 {
+			for i, r := range c.WorkInfo.SecondStep.BinanceFutureWorks {
+				if r.ClientOrderId == clientOrderId {
+					return i, r, nil
+				}
+			}
+			return -1, nil, errors.New("not found work by clientOrderId")
+		} else {
+			return -1, nil, errors.New("this step doesn`t have object.")
+		}
+	} else if exchangeType == ExchangeTypeBinanceSpot {
+		if c.WorkStep == 1 {
+			return -1, nil, errors.New("this step doesn`t have object.")
+		} else if c.WorkStep == 2 {
+			for i, r := range c.WorkInfo.SecondStep.BinanceSpotWorks {
+				if r.ClientOrderId == clientOrderId {
+					return i, r, nil
+				}
+			}
+			return -1, nil, errors.New("not found work by clientOrderId")
 		} else {
 			return -1, nil, errors.New("this step doesn`t have object.")
 		}
@@ -1817,6 +1874,7 @@ func (c *GimchiClient) createGoPaxOrder(i int) error {
 		c.WorkInfo.FirstStep.GoPaxWorks[i].CreatedAt = common.Now()
 		c.WorkInfo.FirstStep.GoPaxWorks[i].OrderPrice = orderPrice
 		c.WorkInfo.FirstStep.GoPaxWorks[i].OrderAmount = orderAmount
+		c.WorkInfo.FirstStep.GoPaxWorks[i].ClientOrderId = clientOrderId
 
 		res, err := c.GoPaxClient.Client.NewCreateOrderService().ClientOrderID(clientOrderId).TradingPairName(c.GoPaxClient.Symbol).Side("buy").Type("limit").Price(int64(orderPrice)).Amount(orderAmount).Do(c.ctx)
 		if err != nil {
@@ -1885,6 +1943,7 @@ func (c *GimchiClient) createBinanceSpotOrder(i int) error {
 
 		c.WorkInfo.SecondStep.BinanceSpotWorks[i].CreatedAt = common.Now()
 		c.WorkInfo.SecondStep.BinanceSpotWorks[i].OrderAmount = orderAmount
+		c.WorkInfo.SecondStep.BinanceSpotWorks[i].ClientOrderId = clientOrderId
 
 		order := c.BinanceSpotClient.Client.NewCreateOrderService().Symbol(c.BinanceSpotClient.Symbol).Side(binance.SideTypeSell).Type(binance.OrderTypeMarket)
 		order.Quantity(strconv.FormatFloat(orderAmount, 'g', -1, 64))
@@ -1944,6 +2003,7 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		c.WorkInfo.FirstStep.BinanceFutureWorks[i].CreatedAt = common.Now()
 		c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderAmount = orderamount
 		c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderPrice = binanceOrderPrice
+		c.WorkInfo.FirstStep.BinanceFutureWorks[i].ClientOrderId = clientOrderId
 
 		clientOrderId = fmt.Sprintf("binance_future_first_%s", strconv.Itoa(i+1))
 
@@ -1977,6 +2037,7 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		orderamount = math.Floor(orderamount*1000) / 1000
 
 		c.WorkInfo.SecondStep.BinanceFutureWorks[i].CreatedAt = common.Now()
+		c.WorkInfo.SecondStep.BinanceFutureWorks[i].ClientOrderId = clientOrderId
 
 		clientOrderId = fmt.Sprintf("binance_future_second_%s", strconv.Itoa(i+1))
 
