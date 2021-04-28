@@ -107,6 +107,7 @@ func (c *Client) parseRequest(r *request, opts ...RequestOption) (err error) {
 		// header.Set("X-MBX-APIKEY", c.APIKey)
 		timestamp := strconv.FormatInt(time.Now().UnixNano()/int64(time.Millisecond), 10)
 		msg := "t" + timestamp + r.method
+		// msg := timestamp + r.method
 		if r.method == "GET" && strings.HasPrefix(r.endpoint, "/orders?") {
 			msg += r.endpoint
 		} else {
@@ -125,6 +126,13 @@ func (c *Client) parseRequest(r *request, opts ...RequestOption) (err error) {
 		mac.Write([]byte(msg))
 		rawSignature := mac.Sum(nil)
 		signature := base64.StdEncoding.EncodeToString(rawSignature)
+
+		// header.Set("API-KEY", c.APIKey)
+		// header.Set("NONCE", timestamp)
+		// header.Set("SIGNATURE", signature)
+		// // if r.recvWindow != -1 {
+		// // 	header.Set("receive-window", strconv.Itoa(int(r.recvWindow)))
+		// // }
 
 		header.Set("api-key", c.APIKey)
 		header.Set("timestamp", timestamp)
@@ -174,7 +182,14 @@ func (c *Client) callAPI(ctx context.Context, r *request, opts ...RequestOption)
 
 	if res.StatusCode != 200 {
 		code := strconv.Itoa(res.StatusCode)
+		respBodyBytes, _ := ioutil.ReadAll(res.Body)
+		respBody := make(map[string]interface{})
+		json.Unmarshal(respBodyBytes, &respBody)
+		resHead := res.Header
+
 		fmt.Println("gopax api http status code = " + code)
+		fmt.Println(respBody)
+		fmt.Println(resHead)
 	}
 
 	data, err = ioutil.ReadAll(res.Body)

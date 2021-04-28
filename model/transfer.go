@@ -48,6 +48,7 @@ type (
 		ClientOrderId string
 		OrderPrice    float64
 		OrderAmount   float64
+		IsOrdered     bool
 		IsFinished    bool
 		CreatedAt     int64
 		UpdatedAt     int64

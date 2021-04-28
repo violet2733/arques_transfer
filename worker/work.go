@@ -921,18 +921,29 @@ func (c *GimchiClient) messageGoPaxUserTradesHandler(message []byte) {
 				openOrder.UpdatedAt = common.Now()
 				c.WorkInfo.FirstStep.GoPaxWorks[i] = openOrder
 
-				orderResult, err := c.GoPaxClient.Client.NewGetOrderService().OrderId(strconv.Itoa(int(orderId))).Do(c.ctx)
-				if err != nil {
-					c.Logger.WithError(err).Error("GoPax Order Result API Call Err")
-				} else {
-					if orderResult.Status == "completed" {
-						// Binance Future Order
-						err := c.createBinanceFutureOrder(i)
-						if err != nil {
-							c.Logger.WithError(err).Error("Failed to create order in binance future")
-						}
+				check := <-c.checkGoPaxOrder(int(orderId))
+				if check {
+					// Binance Future Order
+					_, err := c.createBinanceFutureOrderAsync(i)
+					if err != nil {
+						c.Logger.WithError(err).Error("Failed to create order in binance future")
 					}
 				}
+
+				// orderResult, err := c.GoPaxClient.Client.NewGetOrderService().OrderId(strconv.Itoa(int(orderId))).Do(c.ctx)
+				// if err != nil {
+				// 	c.Logger.WithError(err).Error("GoPax Order Result API Call Err")
+				// } else {
+				// 	// defer c.GoPaxClient.wg.Done()
+
+				// 	if orderResult.Status == "completed" {
+				// 		// Binance Future Order
+				// 		err := c.createBinanceFutureOrder(i)
+				// 		if err != nil {
+				// 			c.Logger.WithError(err).Error("Failed to create order in binance future")
+				// 		}
+				// 	}
+				// }
 
 			}
 		}
@@ -1547,6 +1558,7 @@ func (c *GimchiClient) setFirstStep() *GimchiClient {
 			OrderAmount: 0,
 			// OrderFillAmount: 0,
 			IsFinished: false,
+			IsOrdered:  false,
 			CreatedAt:  0,
 			UpdatedAt:  0,
 		}
@@ -1564,6 +1576,12 @@ func (c *GimchiClient) setFirstStep() *GimchiClient {
 	}
 	c.WorkInfo.FirstStep = f
 	c.WorkStep = 1
+
+	// binance future order list redis 저장
+	var binanceOrderList []int
+	binanceOrderList = append(binanceOrderList, -1)
+	b, _ := json.Marshal(binanceOrderList)
+	_ = c.Rds.Set(c.ctx, "binanceOrderList", b, 0).Err()
 
 	return c
 }
@@ -1585,6 +1603,7 @@ func (c *GimchiClient) setSecondStep() *GimchiClient {
 			OrderAmount: amount,
 			// OrderFillAmount: 0,
 			IsFinished: false,
+			IsOrdered:  false,
 			CreatedAt:  0,
 			UpdatedAt:  0,
 		}
@@ -1605,6 +1624,7 @@ func (c *GimchiClient) setSecondStep() *GimchiClient {
 			OrderAmount: amount,
 			// OrderFillAmount: 0,
 			IsFinished: false,
+			IsOrdered:  false,
 			CreatedAt:  0,
 			UpdatedAt:  0,
 		}
@@ -1846,6 +1866,32 @@ func (c *GimchiClient) goSecondOrderWork() error {
 	return nil
 }
 
+func (c *GimchiClient) checkGoPaxOrder(orderId int) <-chan bool {
+
+	// c.GoPaxClient.wg.Add(1)
+
+	r := make(chan bool)
+
+	go func() {
+		// defer c.GoPaxClient.wg.Done()
+
+		orderResult, err := c.GoPaxClient.Client.NewGetOrderService().OrderId(strconv.Itoa(int(orderId))).Do(c.ctx)
+		if err != nil {
+			c.Logger.WithError(err).Error("GoPax Order Result API Call Err")
+			r <- false
+		} else {
+
+			if orderResult.Status == "completed" {
+				r <- true
+			} else {
+				r <- false
+			}
+		}
+	}()
+
+	return r
+}
+
 // GoPax 에 orderWork 의 index 에 맞는 주문 내역을 주문하기
 func (c *GimchiClient) createGoPaxOrder(i int) error {
 
@@ -1875,6 +1921,7 @@ func (c *GimchiClient) createGoPaxOrder(i int) error {
 		c.WorkInfo.FirstStep.GoPaxWorks[i].OrderPrice = orderPrice
 		c.WorkInfo.FirstStep.GoPaxWorks[i].OrderAmount = orderAmount
 		c.WorkInfo.FirstStep.GoPaxWorks[i].ClientOrderId = clientOrderId
+		c.WorkInfo.FirstStep.GoPaxWorks[i].IsOrdered = true
 
 		res, err := c.GoPaxClient.Client.NewCreateOrderService().ClientOrderID(clientOrderId).TradingPairName(c.GoPaxClient.Symbol).Side("buy").Type("limit").Price(int64(orderPrice)).Amount(orderAmount).Do(c.ctx)
 		if err != nil {
@@ -1958,6 +2005,7 @@ func (c *GimchiClient) createBinanceSpotOrder(i int) error {
 		}
 
 		c.WorkInfo.SecondStep.BinanceSpotWorks[i].OrderId = res.OrderID
+		c.WorkInfo.SecondStep.BinanceSpotWorks[i].IsOrdered = true
 
 		m := Message{
 			Title: "BinanceSpotOrder - SecondStep - " + clientOrderId,
@@ -1975,6 +2023,141 @@ func (c *GimchiClient) createBinanceSpotOrder(i int) error {
 	return nil
 }
 
+func (c *GimchiClient) createBinanceFutureOrderAsync(i int) (data *futures.CreateOrderResponse, err error) {
+
+	// binanceOrderList
+	var binanceOrderList []int
+	value, err := c.Rds.Get(c.ctx, "binanceOrderList").Result()
+	if err != nil {
+		c.Logger.WithError(err).Error("Failed to get in redis data")
+	}
+	err = json.Unmarshal([]byte(value), &binanceOrderList)
+	if err != nil {
+		c.Logger.WithError(err).Error("Failed to convert interface in redis")
+	}
+
+	checker := true
+	for _, idx := range binanceOrderList {
+		if idx == i {
+			checker = false
+		}
+	}
+
+	if checker {
+
+		// redis 에 저장
+		binanceOrderList = append(binanceOrderList, i)
+		b, _ := json.Marshal(binanceOrderList)
+		_ = c.Rds.Set(c.ctx, "binanceOrderList", b, 0).Err()
+
+		c.BinanceFutureClient.wg.Add(1)
+		c.Logger.Info("Binance Future Short Order Start")
+
+		var orderamount float64
+		var clientOrderId string
+		var order *futures.CreateOrderService
+
+		// Binance Future 는 First Step 과 Second Step 에서 모두 사용 되어 분기로 주문 정보 처리
+		if c.WorkStep == 1 {
+			// work = c.WorkInfo.FirstStep.BinanceFutureWorks[i]
+			// First Step 에서는 Limit Order 로 Sell 처리
+			orderamount = c.WorkInfo.FirstStep.GoPaxWorks[i].OrderAmount
+			// Binance 는 주문을 소수점 3자리까지 가능
+			orderamount = math.Floor(orderamount*1000) / 1000
+
+			c.WorkInfo.FirstStep.BinanceFutureWorks[i].CreatedAt = common.Now()
+			c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderAmount = orderamount
+			// c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderPrice = binanceOrderPrice
+			c.WorkInfo.FirstStep.BinanceFutureWorks[i].ClientOrderId = clientOrderId
+
+			clientOrderId = fmt.Sprintf("binance_future_first_%s", strconv.Itoa(i+1))
+
+			// Binance Future Order
+			order = c.BinanceFutureClient.Client.NewCreateOrderService().Symbol(c.BinanceFutureClient.Symbol).Side(futures.SideTypeSell).Type(futures.OrderTypeMarket)
+			order.Quantity(strconv.FormatFloat(orderamount, 'g', -1, 64))
+			order.NewClientOrderID(clientOrderId)
+
+		} else if c.WorkStep == 2 {
+			// Second Step 에서는 Market Order 로 Buy 처리
+			data, err := c.getBinanceFutureAccountInfo()
+			if err != nil {
+				return nil, err
+			}
+
+			// 남은 position 수량 체크 및 음수로 된 Short 상태를 정수로 주문하기 위해 Abs 로 양수 변환
+			remainAmount, _ := strconv.ParseFloat(data.PositionAmt, 8)
+			if remainAmount < 0 {
+				remainAmount = math.Abs(remainAmount)
+			}
+			orderamount = c.WorkInfo.SecondStep.BinanceFutureWorks[i].OrderAmount
+
+			if orderamount > remainAmount {
+				orderamount = remainAmount
+			}
+			orderamount = math.Floor(orderamount*1000) / 1000
+
+			c.WorkInfo.SecondStep.BinanceFutureWorks[i].CreatedAt = common.Now()
+			c.WorkInfo.SecondStep.BinanceFutureWorks[i].OrderAmount = orderamount
+			c.WorkInfo.SecondStep.BinanceFutureWorks[i].ClientOrderId = clientOrderId
+
+			clientOrderId = fmt.Sprintf("binance_future_second_%s", strconv.Itoa(i+1))
+
+			// Binance Future Order
+			order = c.BinanceFutureClient.Client.NewCreateOrderService().Symbol(c.BinanceFutureClient.Symbol).Side(futures.SideTypeBuy).Type(futures.OrderTypeMarket)
+			order.Quantity(strconv.FormatFloat(orderamount, 'g', -1, 64))
+			order.NewClientOrderID(clientOrderId)
+		}
+
+		resChannel := make(chan *futures.CreateOrderResponse, 1)
+		errChannel := make(chan error, 1)
+
+		go func() {
+
+			defer c.BinanceFutureClient.wg.Done()
+
+			res, err := order.Do(c.ctx)
+			if err != nil {
+				c.Logger.WithError(err).WithField("orderAmount", orderamount).Error("Failed to create order in binance future.")
+				resChannel <- nil
+				errChannel <- err
+				return
+			}
+
+			title := ""
+			if c.WorkStep == 1 {
+				c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderId = res.OrderID
+				c.WorkInfo.FirstStep.BinanceFutureWorks[i].IsOrdered = true
+				title = "Binance Future - FirstStep - " + clientOrderId
+			} else if c.WorkStep == 2 {
+				c.WorkInfo.SecondStep.BinanceFutureWorks[i].OrderId = res.OrderID
+				c.WorkInfo.SecondStep.BinanceFutureWorks[i].IsOrdered = true
+				title = "Binance Future - SecondStep - " + clientOrderId
+			}
+
+			m := Message{
+				Title: title,
+				Msg:   res,
+			}
+
+			c.Logger.Info(m)
+			c.RedisPublish(m)
+
+			// OrderResult 로그 저장은 messageHandler에서 수행
+			resChannel <- res
+			errChannel <- nil
+		}()
+
+		data = <-resChannel
+		err = <-errChannel
+
+		return data, err
+
+	} else {
+		c.Logger.Info("Skip Binance Future Order by " + strconv.Itoa(i))
+		return nil, nil
+	}
+}
+
 // Binance Future 에 orderWork 의 index 에 맞는 주문 내역을 주문하기
 func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 
@@ -1985,8 +2168,6 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 	var orderamount float64
 	var clientOrderId string
 	var order *futures.CreateOrderService
-
-	isOrder := true
 
 	// Binance Future 는 First Step 과 Second Step 에서 모두 사용 되어 분기로 주문 정보 처리
 	if c.WorkStep == 1 {
@@ -2002,13 +2183,6 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		// 	c.Logger.WithError(err).Error("Failed convert binance future orderbook price")
 		// 	return err
 		// }
-
-		// 중복 주문 날리는 것 방지하자.
-		if c.WorkInfo.FirstStep.BinanceFutureWorks[i].CreatedAt == 0 {
-			isOrder = true
-		} else {
-			isOrder = false
-		}
 
 		c.WorkInfo.FirstStep.BinanceFutureWorks[i].CreatedAt = common.Now()
 		c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderAmount = orderamount
@@ -2046,13 +2220,6 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		}
 		orderamount = math.Floor(orderamount*1000) / 1000
 
-		// 중복 주문 날리는 것 방지하자.
-		if c.WorkInfo.SecondStep.BinanceFutureWorks[i].CreatedAt == 0 {
-			isOrder = true
-		} else {
-			isOrder = false
-		}
-
 		c.WorkInfo.SecondStep.BinanceFutureWorks[i].CreatedAt = common.Now()
 		c.WorkInfo.SecondStep.BinanceFutureWorks[i].OrderAmount = orderamount
 		c.WorkInfo.SecondStep.BinanceFutureWorks[i].ClientOrderId = clientOrderId
@@ -2065,6 +2232,16 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 		order.NewClientOrderID(clientOrderId)
 	}
 
+	var isOrder bool
+	isOrder = true
+
+	if c.WorkStep == 1 {
+		isOrder = c.WorkInfo.FirstStep.BinanceFutureWorks[i].IsOrdered
+	} else if c.WorkStep == 2 {
+		isOrder = c.WorkInfo.SecondStep.BinanceFutureWorks[i].IsOrdered
+	}
+
+	fmt.Println(isOrder)
 	// 중복이 아닌 경우 주문 실행
 	if isOrder {
 		resChannel := make(chan *futures.CreateOrderResponse, 1)
@@ -2085,9 +2262,11 @@ func (c *GimchiClient) createBinanceFutureOrder(i int) error {
 			title := ""
 			if c.WorkStep == 1 {
 				c.WorkInfo.FirstStep.BinanceFutureWorks[i].OrderId = res.OrderID
+				c.WorkInfo.FirstStep.BinanceFutureWorks[i].IsOrdered = true
 				title = "Binance Future - FirstStep - " + clientOrderId
 			} else if c.WorkStep == 2 {
 				c.WorkInfo.SecondStep.BinanceFutureWorks[i].OrderId = res.OrderID
+				c.WorkInfo.SecondStep.BinanceFutureWorks[i].IsOrdered = true
 				title = "Binance Future - SecondStep - " + clientOrderId
 			}
 
