@@ -1295,7 +1295,11 @@ func (c *GimchiClient) handleBinanceOrderTradeResult(exchangeType ExchangeType, 
 				}
 
 				// Second Step 에서 Binance Spot 의 Sell 주문이 완료 시 Binance Future 의 Short Close 를 위한 buy 주문 실행
-				err := c.createBinanceFutureOrder(i)
+				// err := c.createBinanceFutureOrder(i)
+				// if err != nil {
+				// 	c.Logger.WithError(err).Error("Failed to create order in binance future")
+				// }
+				_, err := c.createBinanceFutureOrderAsync(i)
 				if err != nil {
 					c.Logger.WithError(err).Error("Failed to create order in binance future")
 				}
@@ -1644,6 +1648,12 @@ func (c *GimchiClient) setSecondStep() *GimchiClient {
 	c.WorkInfo.SecondStep = f
 	c.WorkStep = 2
 
+	// binance future order list redis 저장
+	var binanceOrderList []int
+	binanceOrderList = append(binanceOrderList, -1)
+	b, _ := json.Marshal(binanceOrderList)
+	_ = c.Rds.Set(c.ctx, "binanceOrderList", b, 0).Err()
+
 	return c
 }
 
@@ -1788,6 +1798,12 @@ func (c *GimchiClient) goFirstOrderWork() error {
 			c.StopBinanceFutureOrderBookStream()
 			c.StopBinanceFutureUserStream()
 
+			// binance future order list redis 저장
+			var binanceOrderList []int
+			binanceOrderList = append(binanceOrderList, -1)
+			b, _ := json.Marshal(binanceOrderList)
+			_ = c.Rds.Set(c.ctx, "binanceOrderList", b, 0).Err()
+
 			break
 		}
 	}
@@ -1858,6 +1874,12 @@ func (c *GimchiClient) goSecondOrderWork() error {
 			// Second step 에 필요한 stream 끄기
 			c.StopBinanceSpotUserStream()
 			c.StopBinanceFutureUserStream()
+
+			// binance future order list redis 저장
+			var binanceOrderList []int
+			binanceOrderList = append(binanceOrderList, -1)
+			b, _ := json.Marshal(binanceOrderList)
+			_ = c.Rds.Set(c.ctx, "binanceOrderList", b, 0).Err()
 
 			break
 		}
